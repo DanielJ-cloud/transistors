@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRANSISTORS.EXE — A History</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=Press+Start+2P&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --green-dim: #00b32c;
+    --green-dark: #003b0f;
+    --amber: #ffb300;
+    --amber-dim: #a07000;
+    --bg: #0a0a0a;
+    --scan-line: rgba(0,0,0,0.18);
+    --border: #00ff41;
+    --glow: 0 0 8px #00ff41, 0 0 20px #00ff4166;
+    --glow-amber: 0 0 8px #ffb300, 0 0 20px #ffb30066;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+  }
+
+  /* CRT scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      var(--scan-line) 3px,
+      var(--scan-line) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* CRT vignette */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.75) 100%);
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  /* ── BOOT SCREEN ── */
+  #boot-screen {
+    position: fixed;
+    inset: 0;
+    background: #0a0a0a;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 60px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    color: var(--green);
+  }
+
+  .boot-line {
+    opacity: 0;
+    white-space: pre;
+    line-height: 1.8;
+    animation: fadeIn 0.05s forwards;
+  }
+
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  .boot-cursor {
+    display: inline-block;
+    width: 9px;
+    height: 16px;
+    background: var(--green);
+    animation: blink 0.7s steps(1) infinite;
+    vertical-align: bottom;
+    margin-left: 2px;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── MAIN PRESENTATION ── */
+  #presentation {
+    display: none;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+  }
+
+  /* Top bar */
+  #topbar {
+    background: var(--green);
+    color: #000;
+    font-family: 'VT323', monospace;
+    font-size: 22px;
+    padding: 4px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* Slide container */
+  #slides-wrapper {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    padding: 32px 48px 20px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--green-dim) #111;
+  }
+
+  .slide.active { display: flex; }
+
+  /* Slide title */
+  .slide-title {
+    font-family: 'VT323', monospace;
+    font-size: clamp(28px, 4vw, 52px);
+    color: var(--amber);
+    text-shadow: var(--glow-amber);
+    border-bottom: 2px solid var(--amber-dim);
+    padding-bottom: 8px;
+    margin-bottom: 24px;
+    letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+
+  .slide-title .prompt { color: var(--green); font-size: 0.7em; }
+
+  /* Content grid */
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    flex: 1;
+  }
+
+  .content-full {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+  }
+
+  /* DOS boxes */
+  .dos-box {
+    border: 1px solid var(--green-dim);
+    padding: 16px 20px;
+    background: rgba(0,255,65,0.03);
+    position: relative;
+  }
+
+  .dos-box::before {
+    content: attr(data-label);
+    position: absolute;
+    top: -10px;
+    left: 14px;
+    background: #0a0a0a;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--green-dim);
+    font-family: 'Share Tech Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  .dos-box p, .dos-box li {
+    font-size: clamp(12px, 1.4vw, 15px);
+    line-height: 1.75;
+    color: #c8ffd4;
+  }
+
+  .dos-box ul { list-style: none; padding: 0; }
+  .dos-box ul li::before { content: "> "; color: var(--green); }
+  .dos-box ul li { margin-bottom: 6px; }
+
+  .highlight { color: var(--amber); text-shadow: var(--glow-amber); }
+
+  /* ── SLIDE 1: TITLE SLIDE ── */
+  #slide-0 {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+  }
+
+  .big-title {
+    font-family: 'VT323', monospace;
+    font-size: clamp(52px, 9vw, 110px);
+    color: var(--green);
+    text-shadow: var(--glow);
+    line-height: 1;
+    letter-spacing: 4px;
+    animation: flicker 6s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.6; }
+    97% { opacity: 1; }
+    98% { opacity: 0.4; }
+    99% { opacity: 1; }
+  }
+
+  .sub-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(8px, 1.2vw, 13px);
+    color: var(--amber);
+    letter-spacing: 3px;
+    line-height: 2;
+    text-shadow: var(--glow-amber);
+  }
+
+  .chip-art {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(9px, 1vw, 12px);
+    color: var(--green-dim);
+    line-height: 1.4;
+    margin: 8px 0;
+  }
+
+  .press-start {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    color: var(--green);
+    animation: blink 1s steps(1) infinite;
+    margin-top: 10px;
+    cursor: pointer;
+    letter-spacing: 2px;
+  }
+
+  /* ── TRANSISTOR DIAGRAM ── */
+  .transistor-ascii {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(11px, 1.3vw, 14px);
+    color: var(--green);
+    line-height: 1.5;
+    white-space: pre;
+    text-shadow: 0 0 4px #00ff41;
+  }
+
+  /* ── SWITCH ANALOGY ── */
+  .switch-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .switch-label {
+    font-family: 'VT323', monospace;
+    font-size: 22px;
+    color: var(--amber);
+    letter-spacing: 2px;
+  }
+
+  .light-switch-svg {
+    filter: drop-shadow(0 0 8px var(--green));
+  }
+
+  .switch-desc {
+    font-size: 13px;
+    color: #c8ffd4;
+    text-align: center;
+    max-width: 260px;
+    line-height: 1.6;
+  }
+
+  /* ── TIMELINE ── */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    padding-left: 24px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--green-dim);
+  }
+
+  .tl-item {
+    position: relative;
+    padding: 8px 0 8px 16px;
+    font-size: clamp(11px, 1.3vw, 14px);
+    line-height: 1.6;
+    color: #c8ffd4;
+    border-left: none;
+  }
+
+  .tl-item::before {
+    content: '■';
+    position: absolute;
+    left: -14px;
+    color: var(--amber);
+    font-size: 10px;
+    top: 10px;
+  }
+
+  .tl-year {
+    color: var(--amber);
+    font-weight: bold;
+  }
+
+  /* ── STAT BOXES ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .stat-box {
+    border: 1px solid var(--amber-dim);
+    padding: 12px 10px;
+    text-align: center;
+    background: rgba(255,179,0,0.04);
+  }
+
+  .stat-num {
+    font-family: 'VT323', monospace;
+    font-size: clamp(26px, 3vw, 38px);
+    color: var(--amber);
+    text-shadow: var(--glow-amber);
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--green-dim);
+    margin-top: 4px;
+    line-height: 1.4;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── BOTTOM BAR ── */
+  #bottombar {
+    background: #111;
+    border-top: 1px solid var(--green-dim);
+    padding: 6px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--green-dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .nav-btn {
+    background: none;
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 4px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 1px;
+  }
+
+  .nav-btn:hover {
+    background: var(--green);
+    color: #000;
+    box-shadow: var(--glow);
+  }
+
+  .nav-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+    background: none;
+    color: var(--green-dim);
+    box-shadow: none;
+  }
+
+  /* ── PROGRESS BAR ── */
+  #progress-bar {
+    width: 100%;
+    height: 2px;
+    background: #1a1a1a;
+    flex-shrink: 0;
+  }
+
+  #progress-fill {
+    height: 100%;
+    background: var(--green);
+    box-shadow: var(--glow);
+    transition: width 0.4s ease;
+  }
+
+  /* ── SLIDE TRANSITIONS ── */
+  .slide.entering {
+    animation: slideIn 0.3s ease forwards;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── CPU CORNER DECORATION ── */
+  .corner-deco {
+    position: fixed;
+    bottom: 52px;
+    right: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: #1a4a1a;
+    white-space: pre;
+    line-height: 1.3;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* scrollbar */
+  .slide::-webkit-scrollbar { width: 6px; }
+  .slide::-webkit-scrollbar-track { background: #111; }
+  .slide::-webkit-scrollbar-thumb { background: var(--green-dim); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  .circuit-line {
+    font-family: 'Share Tech Mono', monospace;
+    color: #1a4a1a;
+    font-size: 10px;
+    white-space: pre;
+    line-height: 1.2;
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .tag { display: inline-block; background: var(--green-dark); color: var(--green); font-size: 10px; padding: 1px 6px; margin: 2px; border: 1px solid var(--green-dim); }
+
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     BOOT SCREEN
+════════════════════════════════════════════ -->
+<div id="boot-screen">
+  <div id="boot-lines"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PRESENTATION
+════════════════════════════════════════════ -->
+<div id="presentation">
+
+  <div id="topbar">
+    <span>C:\SCHOOL\PRESENTATIONS\TRANSISTORS.EXE</span>
+    <span id="clock">──:──:──</span>
+    <span>MEM: 640K AVAIL</span>
+  </div>
+
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+
+  <div id="slides-wrapper">
+
+    <!-- ── SLIDE 0: TITLE ── -->
+    <div class="slide active" id="slide-0">
+      <div class="big-title">TRANSISTORS</div>
+      <div class="chip-art">
+╔══════════════════════════════════════════════════════════╗
+║  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ║
+║  ░  [B]─────┤  NPN  ├─────[C]   SOLID-STATE PHYSICS  ░  ║
+║  ░              │                                     ░  ║
+║  ░             [E]           THE INVENTION THAT       ░  ║
+║  ░░░░░░░░░░░░░░░░░░░░░░░░░░ CHANGED EVERYTHING ░░░░░░░  ║
+╚══════════════════════════════════════════════════════════╝</div>
+      <div class="sub-title">A HISTORY OF THE DEVICE THAT BUILT THE DIGITAL WORLD<br>── EST. 1947 ──</div>
+      <div class="press-start" onclick="goTo(1)">[ PRESS ENTER TO BEGIN ]</div>
+    </div>
+
+    <!-- ── SLIDE 1: WHAT ARE TRANSISTORS ── -->
+    <div class="slide" id="slide-1">
+      <div class="slide-title"><span class="prompt">C:\&gt;</span> SLIDE 1 // WHAT_ARE_TRANSISTORS.EXE</div>
+      <div class="content-grid">
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="dos-box" data-label="DEFINITION">
+            <p>A <span class="highlight">transistor</span> is a tiny semiconductor device that can <span class="highlight">amplify</span> or <span class="highlight">switch</span> electronic signals and power. It is the fundamental building block of all modern electronics.</p>
+            <br>
+            <p>Made from semiconductor materials — most commonly <span class="highlight">silicon</span> — the transistor replaced the bulky, power-hungry vacuum tube in the 1950s and set off a revolution in electronics.</p>
+          </div>
+          <div class="dos-box" data-label="KEY PROPERTIES">
+            <ul>
+              <li>Controls large currents with small voltages</li>
+              <li>Acts as an amplifier <span class="highlight">OR</span> a digital switch</li>
+              <li>Three terminals: <span class="highlight">Base · Collector · Emitter</span></li>
+              <li>Made from N-type &amp; P-type semiconductor layers</li>
+              <li>Can switch ON/OFF billions of times per second</li>
+            </ul>
+          </div>
+          <div class="dos-box" data-label="TYPES">
+            <ul>
+              <li><span class="highlight">BJT</span> — Bipolar Junction Transistor (NPN / PNP)</li>
+              <li><span class="highlight">MOSFET</span> — Metal-Oxide Semiconductor FET</li>
+              <li><span class="highlight">JFET</span> — Junction Field-Effect Transistor</li>
+            </ul>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:flex-start;">
+          <div class="dos-box" data-label="NPN TRANSISTOR DIAGRAM" style="width:100%">
+            <pre class="transistor-ascii">
+        COLLECTOR (C)
+             │
+         ────┤
+        /    │   NPN
+  BASE─┤  ───┤  TRANSISTOR
+        \    │
+         ────┤
+             │
+        EMITTER (E)
+
+  Base signal controls
+  C → E current flow.
+  Small in → Big out.
+            </pre>
+          </div>
+          <div class="dos-box" data-label="FIRST TRANSISTOR — 1947" style="width:100%">
+            <p>Invented at <span class="highlight">Bell Laboratories</span> on December 23, 1947 by:</p>
+            <br>
+            <ul>
+              <li><span class="highlight">John Bardeen</span></li>
+              <li><span class="highlight">Walter Brattain</span></li>
+              <li><span class="highlight">William Shockley</span></li>
+            </ul>
+            <br>
+            <p>They received the <span class="highlight">Nobel Prize in Physics</span> in 1956.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SLIDE 2: HOW DO THEY WORK ── -->
+    <div class="slide" id="slide-2">
+      <div class="slide-title"><span class="prompt">C:\&gt;</span> SLIDE 2 // HOW_DO_THEY_WORK.EXE</div>
+      <div class="content-grid">
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="dos-box" data-label="THE SWITCH ANALOGY">
+            <p>Think of a transistor as a <span class="highlight">light switch</span> — but instead of your finger flipping it, a small <span class="highlight">electrical signal</span> at the Base terminal controls whether current flows between Collector and Emitter.</p>
+            <br>
+            <p><span class="highlight">OFF (0):</span> No base signal → no current flows → circuit is open.</p>
+            <p><span class="highlight">ON (1):</span> Small base signal → large current flows → circuit is closed.</p>
+            <br>
+            <p>This binary behavior — <span class="highlight">0 and 1</span> — is the foundation of all digital computing. Every bit in your computer is stored &amp; processed by transistors switching on and off.</p>
+          </div>
+          <div class="dos-box" data-label="SEMICONDUCTOR PHYSICS">
+            <ul>
+              <li>Silicon is <span class="highlight">doped</span> with impurities to create P and N regions</li>
+              <li><span class="highlight">N-type</span>: extra electrons (negative charge carriers)</li>
+              <li><span class="highlight">P-type</span>: electron holes (positive charge carriers)</li>
+              <li>Junctions between P/N layers create a <span class="highlight">depletion zone</span></li>
+              <li>Base voltage modulates the depletion zone to allow/block flow</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- LIGHT SWITCH SVG -->
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:center;">
+          <div class="dos-box" data-label="TRANSISTOR = ELECTRONIC SWITCH" style="width:100%;text-align:center;">
+            <div class="switch-container">
+              <svg class="light-switch-svg" width="200" height="260" viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg">
+                <!-- Wall plate -->
+                <rect x="50" y="20" width="100" height="180" rx="10" ry="10" fill="#0d0d0d" stroke="#00ff41" stroke-width="2"/>
+                <rect x="60" y="30" width="80" height="160" rx="6" ry="6" fill="#111" stroke="#00b32c" stroke-width="1"/>
+
+                <!-- Switch rocker (animated) -->
+                <g id="switch-rocker">
+                  <!-- ON position (top half lit) -->
+                  <rect x="75" y="40" width="50" height="65" rx="4" fill="#00ff41" opacity="0.9" id="switch-top"/>
+                  <rect x="75" y="115" width="50" height="65" rx="4" fill="#003b0f" id="switch-bot"/>
+                  <!-- Divider line -->
+                  <line x1="75" y1="110" x2="125" y2="110" stroke="#0a0a0a" stroke-width="3"/>
+                  <!-- ON label -->
+                  <text x="100" y="78" text-anchor="middle" font-family="Share Tech Mono" font-size="14" fill="#000" font-weight="bold">ON</text>
+                  <text x="100" y="150" text-anchor="middle" font-family="Share Tech Mono" font-size="13" fill="#00b32c">OFF</text>
+                </g>
+
+                <!-- Screw details -->
+                <circle cx="68" cy="38" r="4" fill="#1a1a1a" stroke="#00ff41" stroke-width="1"/>
+                <line x1="66" y1="38" x2="70" y2="38" stroke="#00ff41" stroke-width="0.8"/>
+                <circle cx="132" cy="38" r="4" fill="#1a1a1a" stroke="#00ff41" stroke-width="1"/>
+                <line x1="130" y1="38" x2="134" y2="38" stroke="#00ff41" stroke-width="0.8"/>
+                <circle cx="68" cy="182" r="4" fill="#1a1a1a" stroke="#00ff41" stroke-width="1"/>
+                <line x1="66" y1="182" x2="70" y2="182" stroke="#00ff41" stroke-width="0.8"/>
+                <circle cx="132" cy="182" r="4" fill="#1a1a1a" stroke="#00ff41" stroke-width="1"/>
+                <line x1="130" y1="182" x2="134" y2="182" stroke="#00ff41" stroke-width="0.8"/>
+
+                <!-- Wire leads coming off switch -->
+                <line x1="100" y1="200" x2="100" y2="225" stroke="#ffb300" stroke-width="2" stroke-dasharray="4,3"/>
+                <text x="100" y="245" text-anchor="middle" font-family="Share Tech Mono" font-size="10" fill="#ffb300">BASE SIGNAL</text>
+
+                <!-- Glow effect on top when ON -->
+                <ellipse cx="100" cy="72" rx="20" ry="12" fill="#00ff41" opacity="0.12" id="switch-glow"/>
+              </svg>
+
+              <!-- Toggle button -->
+              <button class="nav-btn" id="toggle-switch-btn" onclick="toggleSwitch()" style="font-size:11px;padding:5px 14px;">
+                [TOGGLE SWITCH]
+              </button>
+              <div class="switch-desc" id="switch-state-desc" style="color:var(--green);">
+                <strong style="color:var(--amber);">TRANSISTOR: ON</strong><br>
+                Base signal present → current flows<br>Bit value = <span class="highlight">1</span>
+              </div>
+            </div>
+          </div>
+          <div class="dos-box" data-label="AS AMPLIFIER" style="width:100%">
+            <p>In <span class="highlight">analog mode</span>, a transistor doesn't just switch — it proportionally amplifies. A tiny signal at the Base produces a much larger, identical waveform at the output. This powers <span class="highlight">radios, audio amps, and sensors</span>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SLIDE 3: SOCIETAL IMPLICATIONS ── -->
+    <div class="slide" id="slide-3">
+      <div class="slide-title"><span class="prompt">C:\&gt;</span> SLIDE 3 // SOCIETAL_IMPLICATIONS.EXE</div>
+      <div class="content-full">
+        <div class="two-col">
+          <div class="dos-box" data-label="COMMUNICATIONS REVOLUTION">
+            <ul>
+              <li>Enabled the <span class="highlight">portable transistor radio</span> (1954) — first mass consumer electronics device</li>
+              <li>Democratized access to <span class="highlight">news and music</span> for billions worldwide</li>
+              <li>Led to <span class="highlight">satellite communication</span>, cell phones, and the internet</li>
+              <li>Collapsed the world — information became <span class="highlight">borderless</span></li>
+            </ul>
+          </div>
+          <div class="dos-box" data-label="MEDICINE AND SCIENCE">
+            <ul>
+              <li>Enabled <span class="highlight">digital medical imaging</span> — MRI, CT scans, ultrasound</li>
+              <li>Powered <span class="highlight">pacemakers</span> and hearing aids, saving millions of lives</li>
+              <li>Enabled space exploration — Apollo Guidance Computer used transistors</li>
+              <li>Transformed scientific research with <span class="highlight">digital simulation</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="dos-box" data-label="EDUCATION AND INFORMATION">
+            <ul>
+              <li>Led to the <span class="highlight">personal computer</span> — computing moved from institutions to homes</li>
+              <li>The internet — built on billions of transistors — <span class="highlight">redefined literacy</span></li>
+              <li>Online education made knowledge available to anyone with a device</li>
+              <li>Democratized <span class="highlight">publishing, journalism, and creativity</span></li>
+            </ul>
+          </div>
+          <div class="dos-box" data-label="CULTURAL SHIFTS">
+            <ul>
+              <li>Transistor radios were pivotal in <span class="highlight">youth culture</span> and the 1960s music revolution</li>
+              <li>Television — enabled by transistors — created a <span class="highlight">shared cultural fabric</span></li>
+              <li>Digital cameras and smartphones changed <span class="highlight">how humans record memory</span></li>
+              <li>The <span class="highlight">Information Age</span> is entirely a product of the transistor</li>
+            </ul>
+          </div>
+        </div>
+        <div class="dos-box" data-label="TIMELINE OF SOCIETAL CHANGE">
+          <div class="timeline">
+            <div class="tl-item"><span class="tl-year">1954</span> — First transistor radio (Regency TR-1). AM radio reaches every household.</div>
+            <div class="tl-item"><span class="tl-year">1961</span> — Integrated circuits used in Apollo program. Humanity reaches the moon.</div>
+            <div class="tl-item"><span class="tl-year">1971</span> — Intel 4004: the first microprocessor. 2,300 transistors on a single chip.</div>
+            <div class="tl-item"><span class="tl-year">1981</span> — IBM PC launches. Computing enters the home. Society begins to transform.</div>
+            <div class="tl-item"><span class="tl-year">1991</span> — World Wide Web goes public. The transistor connects all of humanity.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SLIDE 4: COMMERCIAL IMPLICATIONS ── -->
+    <div class="slide" id="slide-4">
+      <div class="slide-title"><span class="prompt">C:\&gt;</span> SLIDE 4 // COMMERCIAL_IMPLICATIONS.EXE</div>
+      <div class="content-full">
+        <div class="stat-row">
+          <div class="stat-box">
+            <span class="stat-num">$600B+</span>
+            <div class="stat-label">Global semiconductor industry annual revenue</div>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num">10<sup style="font-size:0.6em">21</sup></span>
+            <div class="stat-label">Transistors manufactured per year — more than all other manufactured objects combined</div>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num">$3T+</span>
+            <div class="stat-label">Combined value of top 5 tech companies — all built on transistors</div>
+          </div>
+        </div>
+        <div class="two-col" style="margin-top:4px;">
+          <div class="dos-box" data-label="BIRTH OF THE TECH INDUSTRY">
+            <ul>
+              <li><span class="highlight">Silicon Valley</span> was literally named for the transistor's material</li>
+              <li>Shockley Semiconductor (1956) seeded the entire tech ecosystem</li>
+              <li>Companies born from transistors: <span class="highlight">Intel, AMD, TI, Motorola</span></li>
+              <li>The transistor created the <span class="highlight">$5 trillion electronics market</span></li>
+            </ul>
+          </div>
+          <div class="dos-box" data-label="MOORE'S LAW">
+            <p>In <span class="highlight">1965</span>, Gordon Moore (Intel co-founder) observed:</p>
+            <br>
+            <p style="color:var(--amber);font-size:14px;">The number of transistors on a chip doubles roughly every <span class="highlight">2 years</span> while cost halves.</p>
+            <br>
+            <p>This held for 50+ years, driving the relentless improvement of all electronics and enabling exponential growth of the tech economy.</p>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="dos-box" data-label="NEW INDUSTRIES CREATED">
+            <ul>
+              <li><span class="highlight">Consumer electronics</span> — TVs, radios, calculators, cameras</li>
+              <li><span class="highlight">Computing</span> — mainframes → PCs → smartphones → cloud</li>
+              <li><span class="highlight">Telecommunications</span> — cellular networks, satellite systems</li>
+              <li><span class="highlight">Automotive</span> — modern cars contain 1,000+ microchips</li>
+              <li><span class="highlight">Defense &amp; aerospace</span> — GPS, guidance systems, drones</li>
+            </ul>
+          </div>
+          <div class="dos-box" data-label="GLOBALIZATION OF MANUFACTURING">
+            <ul>
+              <li>Semiconductor fabrication became one of the most <span class="highlight">complex supply chains</span> ever built</li>
+              <li>TSMC (Taiwan) manufactures chips for Apple, NVIDIA, AMD</li>
+              <li>The chip shortage of <span class="highlight">2020–2022</span> halted car and consumer goods production worldwide — proving transistors underpin the entire global economy</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SLIDE 5: IMPLICATIONS FOR SOCIETY TODAY ── -->
+    <div class="slide" id="slide-5">
+      <div class="slide-title"><span class="prompt">C:\&gt;</span> SLIDE 5 // SOCIETY_TODAY.EXE</div>
+      <div class="content-full">
+        <div class="three-col">
+          <div class="dos-box" data-label="AI AND MACHINE LEARNING">
+            <p>Modern <span class="highlight">AI chips</span> (GPUs, TPUs) pack <span class="highlight">billions of transistors</span> to perform the matrix math powering large language models, image recognition, and self-driving cars.</p>
+            <br>
+            <p>NVIDIA's H100 GPU: <span class="highlight">80 billion transistors</span>. AI would be impossible without them.</p>
+          </div>
+          <div class="dos-box" data-label="SMARTPHONES &amp; CONNECTIVITY">
+            <p>The phone in your pocket contains a chip with <span class="highlight">15–20 billion transistors</span>, more computing power than all of NASA in 1969.</p>
+            <br>
+            <p>5G networks — enabled by advanced transistor design — connect <span class="highlight">8 billion people</span> and enable real-time global communication.</p>
+          </div>
+          <div class="dos-box" data-label="CLIMATE &amp; ENERGY">
+            <p>Power transistors control <span class="highlight">solar inverters, EV motors, and smart grids</span>. They are essential to the renewable energy transition.</p>
+            <br>
+            <p>But: data centers running on transistors now consume <span class="highlight">~2% of global electricity</span> — a growing environmental concern.</p>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="dos-box" data-label="THE LIMITS — AND WHAT COMES NEXT">
+            <ul>
+              <li>Transistors are now <span class="highlight">2–3 nanometers</span> wide — just 10 atoms across</li>
+              <li>Moore's Law is <span class="highlight">slowing</span> — physical limits of silicon are approaching</li>
+              <li><span class="highlight">3D stacking</span> (chiplets) is extending performance gains</li>
+              <li><span class="highlight">Quantum computing</span> may eventually surpass transistor-based logic</li>
+              <li><span class="highlight">Carbon nanotube</span> and <span class="highlight">graphene</span> transistors are being researched</li>
+            </ul>
+          </div>
+          <div class="dos-box" data-label="GEOPOLITICS OF THE TRANSISTOR">
+            <ul>
+              <li>Semiconductors are now a matter of <span class="highlight">national security</span></li>
+              <li>The US <span class="highlight">CHIPS Act (2022)</span> invested $52B to onshore chip manufacturing</li>
+              <li>Taiwan produces ~90% of the world's most advanced chips — a <span class="highlight">geopolitical flashpoint</span></li>
+              <li>Whoever leads in transistor technology leads in <span class="highlight">AI, defense, and economic power</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="dos-box" data-label="CONCLUSION" style="text-align:center;padding:14px;">
+          <p style="font-family:'VT323',monospace;font-size:24px;color:var(--amber);text-shadow:var(--glow-amber);">
+            The transistor is the most transformative invention in human history.<br>
+            <span style="color:var(--green);font-size:20px;">Every digital device, every network, every AI — all begin with one tiny switch.</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /slides-wrapper -->
+
+  <!-- Bottom bar -->
+  <div id="bottombar">
+    <div>
+      <button class="nav-btn" id="prev-btn" onclick="prevSlide()" disabled>[◄ PREV]</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;" id="slide-dots"></div>
+    <div style="color:var(--green-dim);font-size:11px;" id="slide-counter">SLIDE 1 / 6</div>
+    <div>
+      <button class="nav-btn" id="next-btn" onclick="nextSlide()">[NEXT ►]</button>
+    </div>
+  </div>
+
+</div><!-- /presentation -->
+
+<!-- Corner decoration -->
+<div class="corner-deco" id="corner-deco" style="display:none;">
+┌─────────────────┐
+│  ░░░░░░░░░░░░░  │
+│  ░ [CPU CHIP] ░ │
+│  ░░░░░░░░░░░░░  │
+│   │  │  │  │   │
+└───┘  └──┘  └───┘
+</div>
+
+<script>
+  // ── BOOT SEQUENCE ──
+  const bootLines = [
+    "TRANSISTOR-PC BIOS v2.47  Copyright (C) 1984, Bell Labs Corp.",
+    "",
+    "CPU: SILICON JUNCTION PROCESSOR @ 500 MHz",
+    "MEMORY TEST: 640K OK",
+    "",
+    "C:\\> LOADING PRESENTATION MODULE...",
+    "C:\\> INITIALIZING SEMICONDUCTOR DATABASE...",
+    "C:\\> LOADING HISTORY.DAT .................. OK",
+    "C:\\> LOADING PHYSICS.DAT .................. OK",
+    "C:\\> LOADING SOCIETY.DAT .................. OK",
+    "C:\\> LOADING COMMERCE.DAT ................. OK",
+    "C:\\> LOADING FUTURE.DAT ................... OK",
+    "",
+    "C:\\> ALL MODULES LOADED SUCCESSFULLY.",
+    "C:\\> STARTING TRANSISTORS.EXE...",
+    "",
+  ];
+
+  let lineIndex = 0;
+  const bootEl = document.getElementById('boot-lines');
+
+  function typeLine() {
+    if (lineIndex < bootLines.length) {
+      const div = document.createElement('div');
+      div.className = 'boot-line';
+      div.textContent = bootLines[lineIndex];
+      div.style.animationDelay = (lineIndex * 0.05) + 's';
+      bootEl.appendChild(div);
+      lineIndex++;
+      setTimeout(typeLine, 80);
+    } else {
+      // Add blinking cursor then launch
+      const cur = document.createElement('div');
+      cur.className = 'boot-line';
+      cur.style.animationDelay = '0s';
+      cur.innerHTML = 'C:\\&gt; <span class="boot-cursor"></span>';
+      bootEl.appendChild(cur);
+      setTimeout(launchPresentation, 1200);
+    }
+  }
+
+  typeLine();
+
+  function launchPresentation() {
+    document.getElementById('boot-screen').style.transition = 'opacity 0.5s';
+    document.getElementById('boot-screen').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('boot-screen').style.display = 'none';
+      const p = document.getElementById('presentation');
+      p.style.display = 'flex';
+      document.getElementById('corner-deco').style.display = 'block';
+      buildDots();
+      updateNav();
+      startClock();
+    }, 500);
+  }
+
+  // ── NAVIGATION ──
+  let current = 0;
+  const totalSlides = 6;
+
+  function goTo(n) {
+    const prev = document.getElementById('slide-' + current);
+    const next = document.getElementById('slide-' + n);
+    if (!next) return;
+    prev.classList.remove('active');
+    next.classList.add('active', 'entering');
+    setTimeout(() => next.classList.remove('entering'), 350);
+    current = n;
+    updateNav();
+  }
+
+  function nextSlide() { if (current < totalSlides - 1) goTo(current + 1); }
+  function prevSlide() { if (current > 0) goTo(current - 1); }
+
+  function updateNav() {
+    document.getElementById('prev-btn').disabled = current === 0;
+    document.getElementById('next-btn').disabled = current === totalSlides - 1;
+    document.getElementById('slide-counter').textContent = 'SLIDE ' + (current + 1) + ' / ' + totalSlides;
+    document.getElementById('progress-fill').style.width = ((current / (totalSlides - 1)) * 100) + '%';
+    document.querySelectorAll('.dot').forEach((d, i) => {
+      d.style.background = i === current ? 'var(--green)' : 'var(--green-dark)';
+      d.style.boxShadow = i === current ? 'var(--glow)' : 'none';
+    });
+  }
+
+  function buildDots() {
+    const container = document.getElementById('slide-dots');
+    for (let i = 0; i < totalSlides; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot';
+      d.style.cssText = 'width:10px;height:10px;border:1px solid var(--green-dim);cursor:pointer;transition:all 0.2s;';
+      d.onclick = () => goTo(i);
+      container.appendChild(d);
+    }
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'Enter') nextSlide();
+    if (e.key === 'ArrowLeft') prevSlide();
+  });
+
+  // ── CLOCK ──
+  function startClock() {
+    setInterval(() => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2,'0');
+      const m = String(now.getMinutes()).padStart(2,'0');
+      const s = String(now.getSeconds()).padStart(2,'0');
+      document.getElementById('clock').textContent = h + ':' + m + ':' + s;
+    }, 1000);
+  }
+
+  // ── LIGHT SWITCH TOGGLE ──
+  let switchOn = true;
+  function toggleSwitch() {
+    switchOn = !switchOn;
+    const top = document.getElementById('switch-top');
+    const bot = document.getElementById('switch-bot');
+    const glow = document.getElementById('switch-glow');
+    const desc = document.getElementById('switch-state-desc');
+    if (switchOn) {
+      top.setAttribute('fill', '#00ff41');
+      top.setAttribute('opacity', '0.9');
+      bot.setAttribute('fill', '#003b0f');
+      glow.setAttribute('opacity', '0.12');
+      desc.innerHTML = '<strong style="color:var(--amber);">TRANSISTOR: ON</strong><br>Base signal present → current flows<br>Bit value = <span style="color:var(--amber);">1</span>';
+    } else {
+      top.setAttribute('fill', '#003b0f');
+      top.setAttribute('opacity', '1');
+      bot.setAttribute('fill', '#1a4a00');
+      glow.setAttribute('opacity', '0');
+      desc.innerHTML = '<strong style="color:#666;">TRANSISTOR: OFF</strong><br>No base signal → no current flows<br>Bit value = <span style="color:#666;">0</span>';
+    }
+  }
+</script>
+</body>
+</html>
